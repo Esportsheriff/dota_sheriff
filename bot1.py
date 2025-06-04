@@ -6,7 +6,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.executor import start_webhook
 
 # --- Конфигурация ---
-TELEGRAM_TOKEN = os.getenv("7646662758:AAH27KalaVNnSEM6uvRfwI_i58gwUhLK1Jg")
+TELEGRAM_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # Например: https://dota-sheriff.onrender.com
 WEBHOOK_PATH = f"/webhook/{TELEGRAM_TOKEN}"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
@@ -14,7 +14,7 @@ WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = int(os.getenv("PORT", 3000))  # Render автоматически задаёт PORT
 
-OPENAI_API_KEY = os.getenv("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")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 
 # --- Логирование ---
