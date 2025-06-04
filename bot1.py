@@ -71,7 +71,9 @@ async def analyze_match(msg: types.Message):
                 matches = await r.json()
 
             if not matches:
-                await msg.reply("❌ Не найдено матчей.")
+                await bot.delete_webhook()
+                await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
+                await msg.reply("⚠️ Не найдено матчей. Убедись, что профиль открыт и история матчей доступна. Попробуй снова через пару минут.")
                 return
 
             match_id = matches[0]['match_id']
