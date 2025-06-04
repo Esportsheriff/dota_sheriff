@@ -1,19 +1,26 @@
 import logging
+import os
 import openai
-import aiohttp
-from aiogram import Bot, Dispatcher, types, executor
+from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.utils.executor import start_webhook
 
-# --- Настройки ---
-TELEGRAM_TOKEN = '7646662758:AAH27KalaVNnSEM6uvRfwI_i58gwUhLK1Jg'
-OPENDOTA_API = 'https://api.opendota.com/api'
-OPENAI_API_KEY = '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'
+# --- Конфигурация ---
+TELEGRAM_TOKEN = os.getenv("7646662758:AAH27KalaVNnSEM6uvRfwI_i58gwUhLK1Jg")
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # Например: https://dota-sheriff.onrender.com
+WEBHOOK_PATH = f"/webhook/{TELEGRAM_TOKEN}"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+
+WEBAPP_HOST = "0.0.0.0"
+WEBAPP_PORT = int(os.getenv("PORT", 3000))  # Render автоматически задаёт PORT
+
+OPENAI_API_KEY = os.getenv("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")
 openai.api_key = OPENAI_API_KEY
 
 # --- Логирование ---
 logging.basicConfig(level=logging.INFO)
 
-# --- Бот и диспетчер ---
+# --- Инициализация бота ---
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher(bot)
 
@@ -30,9 +37,8 @@ async def start_handler(msg: types.Message):
         "🔓 Чтобы бот мог анализировать твои матчи, сделай профиль Dota 2 публичным:\n"
         "Steam → Настройки профиля → Пункт 'Игра Dota 2' → Публично\n\n"
         "1. Зайди в Dota 2\n"
-        "2. Нажми на свой профиль (вверху)\n"
-        "3. Перейди в ⚙️ Настройки профиля\n"
-        "4. Включи галочку: «Сделать профиль публичным»\n\n"
+        "2. Перейди в ⚙️ Раздел Сообщество\n"
+        "4. Включи галочку: «Общедоступная история матчей»\n\n"
         "После этого введи: /setsteam [твой Steam32 ID]"
     )
     await msg.reply(instructions, reply_markup=kb)
@@ -59,12 +65,29 @@ async def profile_help(msg: types.Message):
     instructions = (
         "🔓 Чтобы бот мог анализировать твои матчи, сделай профиль Dota 2 публичным:\n\n"
         "1. Зайди в Dota 2\n"
-        "2. Перейди в ⚙️ раздел Сообщестово\n"
+        "2. Перейди в ⚙️ раздел Сообщество\n"
         "3. Включи галочку: «Общедоступная история матчей»\n\n"
         "После этого введи: /setsteam [твой Steam32 ID]"
     )
     await msg.reply(instructions)
 
-# --- Запуск ---
+# --- Webhook lifecycle ---
+async def on_startup(dp):
+    await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
+    logging.info(f"Webhook set to: {WEBHOOK_URL}")
+
+async def on_shutdown(dp):
+    logging.info("Shutting down webhook...")
+    await bot.delete_webhook()
+
+# --- Запуск через Webhook ---
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+    start_webhook(
+        dispatcher=dp,
+        webhook_path=WEBHOOK_PATH,
+        on_startup=on_startup,
+        on_shutdown=on_shutdown,
+        skip_updates=True,
+        host=WEBAPP_HOST,
+        port=WEBAPP_PORT,
+    )
