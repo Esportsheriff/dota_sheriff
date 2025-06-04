@@ -4,16 +4,11 @@ import openai
 import aiohttp
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from aiogram.utils.executor import start_webhook
+from aiogram.utils import executor
 
 # --- Конфигурация ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
-WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-WEBAPP_HOST = "0.0.0.0"
-WEBAPP_PORT = int(os.getenv("PORT", 3000))
 
 openai.api_key = OPENAI_API_KEY
 
@@ -71,8 +66,6 @@ async def analyze_match(msg: types.Message):
                 matches = await r.json()
 
             if not matches:
-                await bot.delete_webhook()
-                await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
                 await msg.reply("⚠️ Не найдено матчей. Убедись, что профиль открыт и история матчей доступна. Попробуй снова через пару минут.")
                 return
 
@@ -124,23 +117,7 @@ async def profile_help(msg: types.Message):
         "3. Введи команду: /setsteam <Steam32 ID>"
     )
 
-# --- Webhook lifecycle ---
-async def on_startup(dp):
-    await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
-    logger.info(f"Webhook set to: {WEBHOOK_URL}")
-
-async def on_shutdown(dp):
-    logger.info("Shutting down webhook...")
-    await bot.delete_webhook()
-
-# --- Запуск через Webhook ---
+# --- Запуск через Polling ---
 if __name__ == "__main__":
-    start_webhook(
-        dispatcher=dp,
-        webhook_path=WEBHOOK_PATH,
-        on_startup=on_startup,
-        on_shutdown=on_shutdown,
-        skip_updates=True,
-        host=WEBAPP_HOST,
-        port=WEBAPP_PORT,
-    )
+    logger.info("Starting bot in polling mode...")
+    executor.start_polling(dp, skip_updates=True)
