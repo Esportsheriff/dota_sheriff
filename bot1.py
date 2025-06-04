@@ -19,6 +19,7 @@ openai.api_key = OPENAI_API_KEY
 
 # --- Логирование ---
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # --- Инициализация бота ---
 bot = Bot(token=BOT_TOKEN)
@@ -35,13 +36,12 @@ kb.add(KeyboardButton("🧠 Анализ последнего матча"))
 # --- Обработчики ---
 @dp.message_handler(commands=["start"])
 async def start_handler(msg: types.Message):
-    instructions = (
+    logger.info(f"/start от {msg.from_user.id}")
+    await msg.reply(
         "Привет! Я бот для анализа матчей Dota 2.\n\n"
-        "Чтобы начать, сделай свой профиль публичным:\n"
-        "Steam → Настройки → Игра Dota 2 → Публично\n\n"
-        "Потом введи команду: /setsteam <твой Steam32 ID>"
+        "Сделай профиль публичным и введи /setsteam <твой Steam32 ID>.",
+        reply_markup=kb
     )
-    await msg.reply(instructions, reply_markup=kb)
 
 @dp.message_handler(commands=["setsteam"])
 async def set_steam_id(msg: types.Message):
@@ -51,7 +51,8 @@ async def set_steam_id(msg: types.Message):
         return
     steam_id = parts[1]
     steam_ids[msg.from_user.id] = steam_id
-    await msg.reply(f"✅ Steam ID сохранён: {steam_id}\n\nТеперь ты можешь использовать команду /analyze")
+    logger.info(f"Steam ID {steam_id} сохранён для {msg.from_user.id}")
+    await msg.reply(f"✅ Steam ID сохранён: {steam_id}\nТеперь можешь использовать /analyze")
 
 @dp.message_handler(commands=["analyze"])
 async def analyze_match(msg: types.Message):
@@ -61,45 +62,43 @@ async def analyze_match(msg: types.Message):
         await msg.reply("⚠️ Сначала введи свой Steam ID через /setsteam")
         return
 
-    await msg.reply("🔄 Загружаю данные последнего матча...")
+    await msg.reply("🔄 Загружаю матч...")
 
     try:
         async with aiohttp.ClientSession() as session:
-            recent_url = f"https://api.opendota.com/api/players/{steam_id}/recentMatches"
-            async with session.get(recent_url) as r:
-                recent_matches = await r.json()
-            if not recent_matches:
-                await msg.reply("⚠️ Матчи не найдены.")
-                return
-            last_match_id = recent_matches[0]['match_id']
+            url = f"https://api.opendota.com/api/players/{steam_id}/recentMatches"
+            async with session.get(url) as r:
+                matches = await r.json()
 
-            match_url = f"https://api.opendota.com/api/matches/{last_match_id}"
-            async with session.get(match_url) as r:
+            if not matches:
+                await msg.reply("❌ Не найдено матчей.")
+                return
+
+            match_id = matches[0]['match_id']
+            url = f"https://api.opendota.com/api/matches/{match_id}"
+            async with session.get(url) as r:
                 match_data = await r.json()
 
         player_data = next((p for p in match_data.get("players", []) if str(p.get("account_id")) == steam_id), None)
         if not player_data:
-            await msg.reply("⚠️ Не удалось найти игрока в матче.")
+            await msg.reply("⚠️ Не найден игрок в матче.")
             return
 
         summary = (
             f"Герой: {player_data.get('hero_id')}\n"
             f"K/D/A: {player_data['kills']}/{player_data['deaths']}/{player_data['assists']}\n"
-            f"Net Worth: {player_data['total_gold']} золота\n"
-            f"Урон по героям: {player_data['hero_damage']}\n"
-            f"Линия: {player_data.get('lane', 'N/A')}\n"
-            f"Победа: {'Да' if player_data.get('win') else 'Нет'}"
+            f"Урон: {player_data['hero_damage']}, Золото: {player_data['total_gold']}"
         )
 
         prompt = (
-            "Ты аналитик Dota 2. Проанализируй игру этого игрока, выдай краткий, но глубокий разбор, ошибки и советы."
-            f"\n\nСтатистика матча:\n{summary}"
+            "Ты эксперт по Dota 2. Проанализируй игру игрока, выдай краткий разбор, советы и ошибки.\n\n"
+            f"Данные:\n{summary}"
         )
 
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Ты эксперт по Dota 2 и анализу матчей."},
+                {"role": "system", "content": "Ты аналитик по Dota 2."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -108,8 +107,8 @@ async def analyze_match(msg: types.Message):
         await msg.reply(f"🧪 Анализ:\n{analysis}")
 
     except Exception as e:
-        logging.exception("Ошибка при анализе матча")
-        await msg.reply("❌ Произошла ошибка при анализе матча.")
+        logger.exception("Ошибка анализа")
+        await msg.reply("❌ Произошла ошибка во время анализа матча.")
 
 @dp.message_handler(lambda msg: msg.text == "🧠 Анализ последнего матча")
 async def analyze_button(msg: types.Message):
@@ -117,22 +116,19 @@ async def analyze_button(msg: types.Message):
 
 @dp.message_handler(lambda msg: msg.text == "📖 Как открыть профиль?")
 async def profile_help(msg: types.Message):
-    instructions = (
-        "🔓 Чтобы бот мог анализировать твои матчи, сделай профиль Dota 2 публичным:\n\n"
-        "1. Зайди в Dota 2\n"
-        "2. Перейди в ⚙️ раздел Сообщество\n"
-        "3. Включи галочку: «Общедоступная история матчей»\n\n"
-        "После этого введи: /setsteam <твой Steam32 ID>"
+    await msg.reply(
+        "1. Steam → Настройки → Игра Dota 2 → Публично\n"
+        "2. В Dota 2: Сообщество → Общедоступная история матчей\n"
+        "3. Введи команду: /setsteam <Steam32 ID>"
     )
-    await msg.reply(instructions)
 
 # --- Webhook lifecycle ---
 async def on_startup(dp):
     await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
-    logging.info(f"Webhook set to: {WEBHOOK_URL}")
+    logger.info(f"Webhook set to: {WEBHOOK_URL}")
 
 async def on_shutdown(dp):
-    logging.info("Shutting down webhook...")
+    logger.info("Shutting down webhook...")
     await bot.delete_webhook()
 
 # --- Запуск через Webhook ---
