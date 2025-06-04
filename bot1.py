@@ -36,11 +36,11 @@ kb.add(KeyboardButton("\ud83e\udde0 Анализ последнего матча
 @dp.message_handler(commands=["start"])
 async def start_handler(msg: types.Message):
     instructions = (
-        "\ud83d\udc4b Привет! Я бот для анализа матчей Dota 2.\n\n"
-        "\ud83d\udd13 Чтобы бот мог анализировать твои матчи, сделай профиль Dota 2 публичным:\n"
-        "Steam \u2192 Настройки профиля \u2192 Пункт 'Игра Dota 2' \u2192 Публично\n\n"
-        "Затем введи: /setsteam [твой Steam32 ID]"
-    )
+    "Привет! Я бот для анализа матчей Dota 2.\n\n"
+    "Чтобы начать, сделай свой профиль публичным:\n"
+    "Steam → Настройки → Игра Dota 2 → Публично\n\n"
+    "Потом введи команду: /setsteam <твой Steam32 ID>"
+)
     await msg.reply(instructions, reply_markup=kb)
 
 @dp.message_handler(commands=["setsteam"])
